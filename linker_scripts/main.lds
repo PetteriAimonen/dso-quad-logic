@@ -50,5 +50,10 @@ SECTIONS
     *(.bss)         /* Zero-filled run time allocate data memory */
     _ebss = .;
     } >ram AT > rom
+    
+    .dummy (NOLOAD) : {
+         /* We don't need no stinking exceptions */
+        *(.ARM.exidx*)
+    }
   }  
 /*========== end of file ==========*/

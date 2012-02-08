@@ -135,18 +135,21 @@ CH_D Trigger source & kind select =>
 #define SYSVER         15       // SYS version number of program modules
 #define FPGAVER        16       // FPGA configuration program version number
 
-#define ADC_DATA       32+0     // 0~7:ADC_CH_A 8~15:ADC_CH_B 16~17:CH_C&CH_D 
-#define PRE_SAMPLING   32+1     // 0~15:Pre-sampling depth
-#define ALL_SAMPLING   32+2     // 0~15:Total sampling depth
-#define CH_A_MIN_MAX   32+3     // 0~7:VMIN 8~15:VMAX 
-#define CH_A_V_SUM     32+4     // 0~15:CH_A voltage sum
-#define CH_A_V_SSQ     32+5     // 0~15:CH_A voltage sum of squares
-#define CH_A_NEDGE     32+6     // 0~15:CH_A number of edge
-#define CH_A_FREQ      32+7     // 0~15:CH_A frequence
-#define CH_A_PHW_MAX   32+8     // 0~15:CH_A pulse high width MAX
-#define CH_A_PHW_MIN   32+9     // 0~15:CH_A pulse high width MIN
-#define CH_A_PLW_MAX   32+10    // 0~15:CH_A pulse low width MAX
-#define CH_A_PLW_MIN   32+11    // 0~15:CH_A pulse low width MIN
+// FPGA register addresses for Set_Param
+#define FPGA_SP_TRIGGMODE    0 // Note: resets other settings to defaults
+#define FPGA_SP_VTHRESHOLD   1
+#define FPGA_SP_TTHRESHOLD_L 2 // Time threshold, bits 0..7
+#define FPGA_SP_TTHRESHOLD_H 3 // Time threshold, bits 8..15
+#define FPGA_SP_CTRLREG      4 // Control register
+#define FPGA_SP_SELECT       5 // Read selector for reading trigger results
+#define FPGA_SP_DEPTH_L      6 // Sample count, bits 0..7
+#define FPGA_SP_DEPTH_H      7 // Sample count, bits 8..11
+#define FPGA_SP_PERCNT_L     8 // Presample count, bits 0..7
+#define FPGA_SP_PERCNT_H     9 // Presample count, bits 8..11
+#define FPGA_SP_DELAY_1     10 // Trigger delay, bits 0..7
+#define FPGA_SP_DELAY_2     11 // Trigger delay, bits 8..15
+#define FPGA_SP_DELAY_3     12 // Trigger delay, bits 16..23
+#define FPGA_SP_DELAY_4     13 // Trigger delay, bits 24..31
 
 // =============================================================================
 
@@ -240,6 +243,8 @@ extern T_attr *T_Attr;
  
  void __Set(u8 Object, u32 Value);
  u32  __Get(u8 Object);
+ 
+ void __Set_Param(u8 RegAddr, u8 Parameter);
  
  void __ExtFlash_PageRD(u8* pBuffer, u32 ReadAddr, u16 NumByteToRead);
  void __ExtFlash_PageWR(u8* pBuffer, u32 WriteAddr);

@@ -1,12 +1,68 @@
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 #include "ds203_io.h"
 #include "BIOS.h"
 #include "Interrupt.h"
-#include "tinyprintf.h"
+#include <stdio.h>
 #include "mathutils.h"
 
 /* ---- LCD drawing ---- */
+
+static struct {
+    uint32_t PC;
+    uint32_t LR;
+    uint32_t SP;
+    uint32_t R7;
+    char BUILDID[32];
+} CRASHDATA;
+
+static const char BUILDID[32] = __DATE__ " " __TIME__;
+
+void crash_with_message(const char *message, void *caller)
+{
+    asm("mov %0, pc" : "=r"(CRASHDATA.PC) : :);
+    asm("mov %0, lr" : "=r"(CRASHDATA.LR) : :);
+    asm("mov %0, sp" : "=r"(CRASHDATA.SP) : :);
+    asm("mov %0, r7" : "=r"(CRASHDATA.R7) : :);
+    memcpy(CRASHDATA.BUILDID, BUILDID, sizeof(BUILDID));
+    
+    __Clear_Screen(0b0000000000011111);
+    __Set(BEEP_VOLUME, 0);
+    
+    int y = 220;
+    lcd_printf(10, y, 0xFFFF, 0, "      %s      ", message);
+    y -= 14;
+    
+    lcd_printf(10, y, 0xFFFF, 0, "Caller: %08lx",
+        (uint32_t)caller
+    );
+    y -= 14;
+    
+    uint32_t* sp = __builtin_frame_address(0);
+    lcd_printf(10, y, 0xFFFF, 0, "Raw stack (from %08lx):", (uint32_t)sp);
+    y -= 14;
+    
+    while (y > 30)
+    {
+        lcd_printf(10, y, 0xFFFF, 0, "  %08lx %08lx %08lx %08lx",
+                   sp[0], sp[1], sp[2], sp[3]);
+        y -= 14;
+        sp += 4;
+    }
+    
+    debugf("Dumping memory...");
+    _fopen_wr("memory.dmp");
+    for (char *p = (char*)0x20000000; p < (char*)0x2000C000; p++)
+        _fputc(*p);
+    if (_fclose())
+        debugf("Memory dumped to memory.dmp");
+    else
+        debugf("Memory dump failed (disc full?).");
+    
+    while(1);
+}
+
 
 static char buffer[55];
 
@@ -276,6 +332,10 @@ void _fputc(char c)
         }
     }
 }
+
+// Hackish
+typedef void (*putcf) (void *, char);
+void tfp_format(void *putp, putcf putf, const char *fmt, va_list va);
 
 // Wrapper of _fputc for tinyprintf.
 static void file_putp(void *p, char c)

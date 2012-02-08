@@ -5,12 +5,17 @@
 
 #include <stm32f10x.h>
 #include <stdbool.h>
+#include <stdarg.h>
 
 /* ----------- Text printing ------------ */
 
+// Print stack trace and display a message
+void crash_with_message(const char *message, void *caller);
+
 // Print to lcd with specified position & color. Mode can be 0 for normal text
 // or 1 for inverted colors (black text on hilighted background).
-int lcd_printf(u16 x0, u16 y0, u16 color, u8 mode, const char *fmt, ...);
+int lcd_printf(u16 x0, u16 y0, u16 color, u8 mode, const char *fmt, ...)
+__attribute__ ((format (printf, 5, 6)));;
 
 // Shorthand function for printing debug messages. Always writes on the bottom
 // row of the screen.

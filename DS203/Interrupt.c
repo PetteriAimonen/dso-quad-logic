@@ -60,8 +60,8 @@ static void puthex(const char *p, int count)
     }
 }
 
-static uint16_t color = 0b0000000000011111;
 static void **sp;
+register void **PSP asm("sp");
 
 void _HardFaultException();
 void HardFaultException(void) __attribute__((noreturn, naked));
@@ -74,17 +74,19 @@ void HardFaultException()
 
 void _HardFaultException()
 {
-    __Point_SCR(0, 0);
-    __LCD_Fill(&color,240*200);
-    __LCD_Fill(&color,240*200);
+    __Clear_Screen(0b0000000000011111);
     
     __Set(BEEP_VOLUME, 0);
     
-    putstring("                    HARDFAULT                ");
+    putstring("\n         HARDFAULT          ");
 
     putstring("\nSP: ");
     puthex((char*) &sp, sizeof(void*));
-    putstring("  PC: ");
+    putstring("  PSP: ");
+    void *psp = PSP;
+    puthex((char*) &psp, sizeof(void*));
+    
+    putstring("\nPC: ");
     puthex((char*) (sp + 6), sizeof(void*));
     putstring("  LR: ");
     puthex((char*) (sp + 5), sizeof(void*));
@@ -102,11 +104,12 @@ void _HardFaultException()
     putstring("\nSCB HFSR: ");
     puthex((char*) &(SCB->HFSR), sizeof(SCB->HFSR));
     
-    putstring("\nSCB CFSR: ");
+    putstring(" CFSR: ");
     puthex((char*) &(SCB->CFSR), sizeof(SCB->CFSR));
     
     putstring("\nSTACK DUMP:\n");
-    for (int i = 0; i < 32; i++)
+    int i;
+    for (i = 0; i < 32; i++)
     {
         puthex((char*) (sp + i), sizeof(void*));
         if (i % 4 == 3)
@@ -133,6 +136,8 @@ void UsageFaultException(void)
 {
   while (1) {}
 }
+
+extern void my_usb_istr();
 
 void USB_HP_CAN_TX_IRQHandler(void)
 {

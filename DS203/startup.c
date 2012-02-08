@@ -1,6 +1,7 @@
 #include "stm32f10x.h"
 #include "Interrupt.h"
 #include "BIOS.h"
+#include <stdlib.h>
 
 typedef void( *const intfunc )( void );
 
@@ -63,6 +64,11 @@ void __Init_Data(void) {
     dst = &_sbss;
     while(dst < &_ebss)
         *(dst++) = 0;
+    
+    /* give rest of the memory to malloc */
+    void *block_start = &_ebss;
+    void *block_end = (void*)&_estack - 4096; // Reserve 4kB for stack
+    add_malloc_block(block_start, block_end - block_start);
 }
 
 register void *stack_pointer asm("sp");
