@@ -215,6 +215,7 @@ int main(void)
     __Read_FIFO();
     __Read_FIFO();
     
+    while (~__Get(KEY_STATUS) & ALL_KEYS);
     DelayMs(500); // Wait for ADC to settle
     
     // Samplerate is 6 MHz, two TMR1 cycles per sample -> ARR = 6 - 1
@@ -416,7 +417,7 @@ int main(void)
             DelayMs(3000);
         }
         
-        if (keys & KEY4_STATUS)
+        if (keys & KEY3_STATUS)
         {
             clearline(0);
             char *name = select_filename("logic%03d.bmp");
