@@ -334,6 +334,9 @@ int main(void)
     statustext.valign = TextDrawable::BOTTOM;
     screenobjs.push_back(&statustext);
     
+    int moves = 0;
+    uint32_t old_keys = 0;
+    
     while(1) {
         xpos.set_zoom(xpos.get_zoom());
         
@@ -444,27 +447,28 @@ int main(void)
             DelayMs(500);
         }
         
-        int moves = 0;
-        if (keys & K_ITEM_D_STATUS)
-        {
-            if (moves < 0)
-                moves -= 1;
-            else
-                moves = -5;
-            xpos.move_xpos(moves);
-        }
-        else if (keys & K_ITEM_I_STATUS)
-        {
-            if (moves > 0)
-                moves += 1;
-            else
-                moves = 5;
-            xpos.move_xpos(moves);
-        }
+        if ((keys & (K_ITEM_D_STATUS | K_ITEM_I_STATUS))
+            && keys == old_keys)
+            moves++;
         else
-        {
             moves = 0;
-        }
+        old_keys = keys;
+        
+        int move_speed = 1;
+        if (moves > 50)
+            move_speed = 20;
+        else if (moves > 10)
+            move_speed = 10;
+        else if (moves > 5)
+            move_speed = 5;
+        else if (moves > 2)
+            move_speed = 2;
+        
+        if (keys & K_ITEM_D_STATUS)
+            xpos.move_xpos(-move_speed);
+
+        if (keys & K_ITEM_I_STATUS)
+            xpos.move_xpos(move_speed);
         
         int zoom = xpos.get_zoom();
         if ((keys & K_INDEX_D_STATUS) && zoom > -30)

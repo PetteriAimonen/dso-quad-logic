@@ -66,8 +66,6 @@ void BreakLines::Prepare(int xstart, int xend)
         char buffer[10];
         format_time(buffer, sizeof(buffer), brk.right - brk.left, tickfreq);
         
-        printf("Time %lu result '%s'\n", (uint32_t)(brk.right - brk.left), buffer);
-        
         texts.emplace_back(brk.x, y1, buffer);
         texts.back().halign = TextDrawable::CENTER;
         texts.back().color = textcolor;
