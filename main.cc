@@ -187,9 +187,6 @@ DECLARE_GPIO(usart1_rx, GPIOA, 10);
 int main(void)
 {   
     __Set(BEEP_VOLUME, 0);
-//     NVIC_DisableIRQ(USB_HP_CAN1_TX_IRQn);
-//     NVIC_DisableIRQ(USB_LP_CAN1_RX0_IRQn);
-//     NVIC_DisableIRQ(TIM3_IRQn);
     
     // USART1 8N1 115200bps debug port
     RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
@@ -212,11 +209,13 @@ int main(void)
     __Set(T_BASE_ARR, 5);
     __Set(CH_A_OFFSET, 0);
     __Set(CH_B_OFFSET, 0);
-    
-    DelayMs(1000); // Wait for ADC to settle
-    
     __Set_Param(FPGA_SP_PERCNT_L, 0);
     __Set_Param(FPGA_SP_PERCNT_H, 0);
+    
+    __Read_FIFO();
+    __Read_FIFO();
+    
+    DelayMs(500); // Wait for ADC to settle
     
     // Samplerate is 6 MHz, two TMR1 cycles per sample -> ARR = 6 - 1
     // Channel 1: MCO to sample ADC
@@ -226,7 +225,7 @@ int main(void)
     // TMR cycle:    0  1  2  3  4  5  0  1  2  3  4  5 0
     // MCO output:  _|^^^^^^^^^^^^^^^^^|________________|^
     // H_L:         _|^^^^^^^^^^^^^^^^^|________________|^
-    // DMA sample:   ^ read ch A&B     ^ read ch C&D
+    // DMA sample:         ^ read ch A&B     ^ read ch C&D
     TIM1->CR1 = 0; // Turn off TIM1 until we are ready
     TIM1->CR2 = 0;
     TIM1->CNT = 0;
@@ -238,7 +237,7 @@ int main(void)
     TIM1->DIER = TIM_DIER_CC2DE | TIM_DIER_CC4DE;
     TIM1->CCR1 = 0;
     TIM1->CCR2 = 0;
-    TIM1->CCR4 = 2;
+    TIM1->CCR4 = 3;
     
     // DMA1 channel 3: copy data from hl_set to GPIOC->BSRR
     // Priority: very high
@@ -250,7 +249,7 @@ int main(void)
     DMA1_Channel3->CNDTR = 2;
     DMA1_Channel3->CPAR = (uint32_t)&GPIOC->BSRR;
     DMA1_Channel3->CMAR = (uint32_t)hl_set;
-    DMA1_Channel3->CCR = 0x2AB1;
+    DMA1_Channel3->CCR = 0x3AB1;
     
     // DMA1 channel 4: copy data from FPGA to adc_fifo.
     // Priority: very high
@@ -296,6 +295,12 @@ int main(void)
         SignalGraph* graph = new SignalGraph(stream, &xpos, i);
         graph->y0 = 150 - i * 30;
         graph->color = colors[i];
+        if (i == 0 || i == 1)
+        {
+            // FIXME: A hack for missync in input channels
+            graph->offset = 6;
+        }
+        
         graphwindow.items.push_back(graph);
         
         int middle_y = graph->y0 + graph->height / 2;

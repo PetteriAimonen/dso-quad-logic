@@ -36,6 +36,13 @@ void DSOSignalStream::seek(signaltime_t time)
     while (previous_event.end < time && read_forwards(dummy));
     
     while (previous_event.end > time && read_backwards(dummy));
+    
+    if (previous_event.end > time || previous_was_last)
+    {
+        read_pos = 0;
+        previous_event = SignalEvent();
+        previous_was_last = false;
+    }
 }
 
 bool DSOSignalStream::read_forwards(SignalEvent &result)
