@@ -159,9 +159,6 @@ void XPosHandler::move_xpos(int pixels)
     signaltime_t old_pos = x_pos;
     x_pos = get_time(get_x(x_pos) + pixels);
     
-    if (x_pos < 0)
-        x_pos = 0;
-    
     if (x_pos == old_pos)
     {
         // Verify that we always move somewhere
@@ -170,6 +167,9 @@ void XPosHandler::move_xpos(int pixels)
         else if (pixels < 0)
             x_pos--;
     }
+    
+    if (x_pos < 0)
+        x_pos = 0;
     
     set_zoom(zoom);
 }
