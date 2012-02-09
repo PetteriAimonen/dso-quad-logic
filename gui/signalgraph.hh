@@ -19,8 +19,6 @@ public:
     int height; // Default: 16
     uint16_t color; // Default: White
     
-    int offset; // FIXME: horrible ugly ugly hack, remove once signal capture is properly synced between channels
-    
 private:
     std::unique_ptr<SignalStream> stream;
     signals_t channel_mask;

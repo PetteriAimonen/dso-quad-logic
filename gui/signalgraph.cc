@@ -1,7 +1,7 @@
 #include "signalgraph.hh"
 
 SignalGraph::SignalGraph(const SignalStream &stream, const XPosHandler *xpos, int channel):
-y0(0), height(16), color(0xFFFF), offset(0),
+y0(0), height(16), color(0xFFFF),
 stream(stream.clone()), channel_mask(1 << channel),
 current_event(), xpos(xpos)
 {
@@ -9,14 +9,14 @@ current_event(), xpos(xpos)
 
 void SignalGraph::Prepare(int xstart, int xend)
 {
-    signaltime_t start = xpos->get_time(xstart) + offset;
+    signaltime_t start = xpos->get_time(xstart);
     stream->seek(start);
     stream->read_forwards(current_event);
 }
 
 void SignalGraph::Draw(uint16_t buffer[], int screenheight, int x)
 {
-    signaltime_t time = xpos->get_time(x) + offset;
+    signaltime_t time = xpos->get_time(x);
     
     signals_t positive = 0, negative = 0;
     

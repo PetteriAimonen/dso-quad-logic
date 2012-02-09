@@ -67,8 +67,8 @@ process_samples(const uint32_t *data)
     static uint32_t old = 0;
     static signaltime_t count = 0;
     
-    // Compare the second-highest bit of each channel and the digital inputs.
-    const uint32_t mask = 0x00034040;
+    // Compare the highest bit of each channel and the digital inputs.
+    const uint32_t mask = 0x00038080;
     
     const uint32_t *end = data + ADC_FIFO_HALFSIZE;
     for(;;)
@@ -85,7 +85,7 @@ process_samples(const uint32_t *data)
         // Just a sanity-check
         if (*data & 0xFF000000)
         {
-            debugf("Too bad, lost the H_L sync");
+            debugf("Too bad, lost the H_L sync %08lx at %lu ", *data, (uint32_t) count);
             while(1);
         }
         
@@ -115,8 +115,8 @@ process_samples(const uint32_t *data)
         count = 0;
         
         signal_buffer.last_value = 0;
-        if (*data & 0x00000040) signal_buffer.last_value |= 1; // Channel A
-        if (*data & 0x00004000) signal_buffer.last_value |= 2; // Channel B
+        if (*data & 0x00000080) signal_buffer.last_value |= 1; // Channel A
+        if (*data & 0x00008000) signal_buffer.last_value |= 2; // Channel B
         if (*data & 0x00010000) signal_buffer.last_value |= 4; // Channel C
         if (*data & 0x00020000) signal_buffer.last_value |= 8; // Channel D
     }
@@ -199,14 +199,14 @@ int main(void)
     __Set(ADC_MODE, SEPARATE);               
 
     __Set(CH_A_COUPLE, DC);
-    __Set(CH_A_RANGE, ADC_1V);
+    __Set(CH_A_RANGE, ADC_500mV);
     
     __Set(CH_B_COUPLE, DC);
-    __Set(CH_B_RANGE, ADC_1V);
+    __Set(CH_B_RANGE, ADC_500mV);
     
     __Set(TRIGG_MODE, UNCONDITION);
     __Set(T_BASE_PSC, 0);
-    __Set(T_BASE_ARR, 5);
+    __Set(T_BASE_ARR, 1); // MCO as sysclock/2
     __Set(CH_A_OFFSET, 0);
     __Set(CH_B_OFFSET, 0);
     __Set_Param(FPGA_SP_PERCNT_L, 0);
@@ -218,8 +218,7 @@ int main(void)
     while (~__Get(KEY_STATUS) & ALL_KEYS);
     DelayMs(500); // Wait for ADC to settle
     
-    // Samplerate is 6 MHz, two TMR1 cycles per sample -> ARR = 6 - 1
-    // Channel 1: MCO to sample ADC
+    // Samplerate is 500kHz, two TMR1 cycles per sample -> PSC = 12 -1, ARR = 6 - 1
     // Channel 2: Trigger DMA Ch3 to write H_L bit
     // Channel 4: Trigger DMA Ch4 to read data to memory
     //
@@ -233,12 +232,12 @@ int main(void)
     TIM1->SR = 0;
     TIM1->PSC = 11;
     TIM1->ARR = 5;
-    TIM1->CCMR1 = 0x0030; // CC2 time base, CC1 toggle output
+    TIM1->CCMR1 = 0x0000; // CC2 time base
     TIM1->CCMR2 = 0x0000; // CC4 time base
     TIM1->DIER = TIM_DIER_CC2DE | TIM_DIER_CC4DE;
     TIM1->CCR1 = 0;
     TIM1->CCR2 = 0;
-    TIM1->CCR4 = 3;
+    TIM1->CCR4 = 2;
     
     // DMA1 channel 3: copy data from hl_set to GPIOC->BSRR
     // Priority: very high
@@ -251,6 +250,7 @@ int main(void)
     DMA1_Channel3->CPAR = (uint32_t)&GPIOC->BSRR;
     DMA1_Channel3->CMAR = (uint32_t)hl_set;
     DMA1_Channel3->CCR = 0x3AB1;
+    GPIOC->BSRR = hl_set[1];
     
     // DMA1 channel 4: copy data from FPGA to adc_fifo.
     // Priority: very high
@@ -296,11 +296,6 @@ int main(void)
         SignalGraph* graph = new SignalGraph(stream, &xpos, i);
         graph->y0 = 150 - i * 30;
         graph->color = colors[i];
-        if (i == 0 || i == 1)
-        {
-            // FIXME: A hack for missync in input channels
-            graph->offset = 6;
-        }
         
         graphwindow.items.push_back(graph);
         
