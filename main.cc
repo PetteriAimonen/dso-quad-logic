@@ -20,6 +20,7 @@ extern "C" {
 #include "breaklines.hh"
 #include "window.hh"
 #include "cursor.hh"
+#include "grid.hh"
 
 // For some reason, the headers don't have this register
 #define FSMC_BTR1   (*((vu32 *)(0xA0000000+0x04)))
@@ -187,6 +188,7 @@ DECLARE_GPIO(usart1_rx, GPIOA, 10);
 int main(void)
 {   
     __Set(BEEP_VOLUME, 0);
+    __Display_Str(80, 50, RGB565RGB(0,255,0), 0, (u8*)"Logic Analyzer (c) 2012 jpa");
     
     // USART1 8N1 115200bps debug port
     RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
@@ -289,6 +291,12 @@ int main(void)
     Window graphwindow(64, 0, 400, 240);
     screenobjs.push_back(&graphwindow);
 
+    Grid grid(stream, &xpos);
+    grid.color = RGB565RGB(63, 63, 63);
+    grid.y0 = 60;
+    grid.y1 = 170;
+    graphwindow.items.push_back(&grid);
+    
     uint16_t colors[4] = {0xFFE0, 0x07FF, 0xF81F, 0x07E0};
     char names[4][6] = {"CH(A)", "CH(B)", "CH(C)", "CH(D)"};
     for (int i = 0; i < 4; i++)
@@ -358,6 +366,9 @@ int main(void)
         {
             DelayMs(10);
             keys = ~__Get(KEY_STATUS);
+            
+            if (!(keys & ALL_KEYS))
+                moves = 0;
         }
         
         if (keys & KEY1_STATUS)

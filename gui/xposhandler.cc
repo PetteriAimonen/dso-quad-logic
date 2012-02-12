@@ -3,7 +3,7 @@
 XPosHandler::XPosHandler(int screenwidth, const SignalStream &stream):
     screenwidth(screenwidth),
     zoom(0),
-    collapse_threshold(screenwidth),
+    collapse_threshold(screenwidth / 2),
     collapse_length(screenwidth / 4)
 {
     this->stream.reset(stream.clone());

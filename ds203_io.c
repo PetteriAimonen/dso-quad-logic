@@ -394,8 +394,7 @@ static uint16_t palette[16] = {
     RGB565RGB(128,0,0), RGB565RGB(0,128,0), RGB565RGB(0,0,128),
     
     // Following 4 places are used for application-specific colors
-    RGB565RGB(128, 255, 128), RGB565RGB(255, 255, 128),
-    RGB565RGB(96, 191, 96), RGB565RGB(191, 191, 96)
+    RGB565RGB(63, 63, 63)
 };
 
 // Find the closest color in palette, using Manhattan distance.
