@@ -154,6 +154,77 @@ void __irq__ DMA1_Channel4_IRQHandler()
     }
 }
 
+void start_capture()
+{
+    // Samplerate is 500kHz, two TMR1 cycles per sample -> PSC = 12 -1, ARR = 6 - 1
+    // Channel 2: Trigger DMA Ch3 to write H_L bit
+    // Channel 4: Trigger DMA Ch4 to read data to memory
+    //
+    // TMR cycle:    0  1  2  3  4  5  0  1  2  3  4  5 0
+    // MCO output:  _|^^^^^^^^^^^^^^^^^|________________|^
+    // H_L:         _|^^^^^^^^^^^^^^^^^|________________|^
+    // DMA sample:         ^ read ch A&B     ^ read ch C&D
+    TIM1->CR1 = 0; // Turn off TIM1 until we are ready
+    TIM1->CR2 = 0;
+    TIM1->CNT = 0;
+    TIM1->SR = 0;
+    TIM1->PSC = 11;
+    TIM1->ARR = 5;
+    TIM1->CCMR1 = 0x0000; // CC2 time base
+    TIM1->CCMR2 = 0x0000; // CC4 time base
+    TIM1->DIER = TIM_DIER_CC2DE | TIM_DIER_CC4DE;
+    TIM1->CCR1 = 0;
+    TIM1->CCR2 = 0;
+    TIM1->CCR4 = 2;
+    
+    // Reset the signal buffer
+    signal_buffer.last_duration = 0;
+    signal_buffer.bytes = 0;
+    
+    // DMA1 channel 3: copy data from hl_set to GPIOC->BSRR
+    // Priority: very high
+    // MSIZE = PSIZE = 32 bits
+    // MINC enabled, CIRC mode enabled
+    // Direction: read from memory
+    // No interrupts
+    DMA1_Channel3->CCR = 0;
+    DMA1_Channel3->CNDTR = 2;
+    DMA1_Channel3->CPAR = (uint32_t)&GPIOC->BSRR;
+    DMA1_Channel3->CMAR = (uint32_t)hl_set;
+    DMA1_Channel3->CCR = 0x3AB1;
+    GPIOC->BSRR = hl_set[1];
+    
+    // DMA1 channel 4: copy data from FPGA to adc_fifo.
+    // Priority: very high
+    // MSIZE = PSIZE = 16 bits
+    // MINC enabled, CIRC mode enabled
+    // Direction: read from peripheral
+    // Half- and Full-transfer interrupts, plus error interrupt
+    DMA1_Channel4->CCR = 0;
+    DMA1_Channel4->CNDTR = sizeof(adc_fifo) / 2;
+    DMA1_Channel4->CPAR = 0x64000000; // FPGA memory-mapped address
+    DMA1_Channel4->CMAR = (uint32_t)adc_fifo;
+    DMA1_Channel4->CCR = 0x35AF;
+    
+    // Reduce the wait states of the FPGA & LCD interface
+    FSMC_BTR1 = 0x10100110;
+    FSMC_BTR2 = 0x10100110;
+    
+    // Downgrade the LCD transfer priority to medium
+    DMA1_Channel1->CCR &= ~DMA_CCR1_PL_1;
+    DMA1_Channel2->CCR &= ~DMA_CCR1_PL_1;
+    
+    // Clear any pending interrupts for ch 4
+    DMA1->IFCR = 0x0000F000;
+    
+    // Enable ch 4 interrupt
+    NVIC_EnableIRQ(DMA1_Channel4_IRQn);
+    NVIC_SetPriority(DMA1_Channel4_IRQn, 0); // Highest priority
+    
+    // Now, lets go!
+    TIM1->CR1 |= TIM_CR1_CEN;
+}
+
 void draw_screen(const std::vector<Drawable*> &objs, int startx, int endx)
 {
     const int screenheight = 240;
@@ -220,69 +291,7 @@ int main(void)
     while (~__Get(KEY_STATUS) & ALL_KEYS);
     DelayMs(500); // Wait for ADC to settle
     
-    // Samplerate is 500kHz, two TMR1 cycles per sample -> PSC = 12 -1, ARR = 6 - 1
-    // Channel 2: Trigger DMA Ch3 to write H_L bit
-    // Channel 4: Trigger DMA Ch4 to read data to memory
-    //
-    // TMR cycle:    0  1  2  3  4  5  0  1  2  3  4  5 0
-    // MCO output:  _|^^^^^^^^^^^^^^^^^|________________|^
-    // H_L:         _|^^^^^^^^^^^^^^^^^|________________|^
-    // DMA sample:         ^ read ch A&B     ^ read ch C&D
-    TIM1->CR1 = 0; // Turn off TIM1 until we are ready
-    TIM1->CR2 = 0;
-    TIM1->CNT = 0;
-    TIM1->SR = 0;
-    TIM1->PSC = 11;
-    TIM1->ARR = 5;
-    TIM1->CCMR1 = 0x0000; // CC2 time base
-    TIM1->CCMR2 = 0x0000; // CC4 time base
-    TIM1->DIER = TIM_DIER_CC2DE | TIM_DIER_CC4DE;
-    TIM1->CCR1 = 0;
-    TIM1->CCR2 = 0;
-    TIM1->CCR4 = 2;
-    
-    // DMA1 channel 3: copy data from hl_set to GPIOC->BSRR
-    // Priority: very high
-    // MSIZE = PSIZE = 32 bits
-    // MINC enabled, CIRC mode enabled
-    // Direction: read from memory
-    // No interrupts
-    DMA1_Channel3->CCR = 0;
-    DMA1_Channel3->CNDTR = 2;
-    DMA1_Channel3->CPAR = (uint32_t)&GPIOC->BSRR;
-    DMA1_Channel3->CMAR = (uint32_t)hl_set;
-    DMA1_Channel3->CCR = 0x3AB1;
-    GPIOC->BSRR = hl_set[1];
-    
-    // DMA1 channel 4: copy data from FPGA to adc_fifo.
-    // Priority: very high
-    // MSIZE = PSIZE = 16 bits
-    // MINC enabled, CIRC mode enabled
-    // Direction: read from peripheral
-    // Half- and Full-transfer interrupts, plus error interrupt
-    DMA1_Channel4->CCR = 0;
-    DMA1_Channel4->CNDTR = sizeof(adc_fifo) / 2;
-    DMA1_Channel4->CPAR = 0x64000000; // FPGA memory-mapped address
-    DMA1_Channel4->CMAR = (uint32_t)adc_fifo;
-    DMA1_Channel4->CCR = 0x35AF;
-    
-    // Reduce the wait states of the FPGA & LCD interface
-    FSMC_BTR1 = 0x10100110;
-    FSMC_BTR2 = 0x10100110;
-    
-    // Downgrade the LCD transfer priority to medium
-    DMA1_Channel1->CCR &= ~DMA_CCR1_PL_1;
-    DMA1_Channel2->CCR &= ~DMA_CCR1_PL_1;
-    
-    // Clear any pending interrupts for ch 4
-    DMA1->IFCR = 0x0000F000;
-    
-    // Enable ch 4 interrupt
-    NVIC_EnableIRQ(DMA1_Channel4_IRQn);
-    NVIC_SetPriority(DMA1_Channel4_IRQn, 0); // Highest priority
-    
-    // Now, lets go!
-    TIM1->CR1 |= TIM_CR1_CEN;
+    start_capture();
     
     DSOSignalStream stream(&signal_buffer);
     XPosHandler xpos(400, stream);
@@ -373,8 +382,7 @@ int main(void)
         
         if (keys & KEY1_STATUS)
         {
-            signal_buffer.last_duration = 0;
-            signal_buffer.bytes = 0;
+            start_capture();
             xpos.set_xpos(0);
         }
         
@@ -445,18 +453,15 @@ int main(void)
         
         if (keys & KEY4_STATUS)
         {
-            clearline(0);
-            debugf("Dumping memory");
-            _fopen_wr("memory.dmp");
-            for (char *p = (char*)0x20000000; p < (char*)0x2000C000; p++)
-                _fputc(*p);
+            // Holding the button for 5 seconds initiates memory dump
+            DelayMs(5000);
             
-            clearline(0);
-            if (_fclose())
-                debugf("Success!");
-            else
-                debugf("Fail!");
-            DelayMs(500);
+            keys = ~__Get(KEY_STATUS);
+            if (keys & KEY4_STATUS)
+            {
+                crash_with_message("User-initiated memory dump",
+                                   __builtin_return_address(0));
+            }
         }
         
         if ((keys & (K_ITEM_D_STATUS | K_ITEM_I_STATUS))
