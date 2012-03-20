@@ -7,8 +7,8 @@ NAME = LOGICAPP
 # Names of the object files (add all .c files you want to include)
 OBJS = main.o ds203_io.o dsosignalstream.o \
 xposhandler.o textdrawable.o signalgraph.o \
-breaklines.o cursor.o window.o grid.o \
-cxxglue.o libc_glue.o fix16.o
+breaklines.o cursor.o window.o grid.o timemeasure.o \
+cxxglue.o libc_glue.o fix16.o fix16_exp.o lcd.o buttons.o
 
 # Linker script (choose which application position to use)
 LFLAGS  = -L linker_scripts -T app3.lds
@@ -76,7 +76,7 @@ build/%.o: DS203/%.S
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 build/%.o: libfixmath/%.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) -DFIXMATH_NO_CACHE -c -o $@ $<
 
 # C++ files
 

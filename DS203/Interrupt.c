@@ -5,13 +5,6 @@
 #include "Interrupt.h"
 #include "BIOS.h"
 
-vu32 vu32Tick;
-vu8  Cursor_Cnt, Key_Wait_Cnt, Key_Repeat_Cnt, Key_Buffer, Cnt_mS, Cnt_20mS;
-vu8  Twink, Blink;
-u8   Volume=20, Light;
-vu16 Delay_Cnt, Beep_mS, Key_Status_Last, Sec_Cnt, PD_Cnt;
-vu32 Wait_Cnt; 
-
 void NMIException(void)
 {}
 
@@ -74,6 +67,10 @@ void HardFaultException()
 
 void _HardFaultException()
 {
+    int i;
+    DMA1_Channel4->CCR = DMA1_Channel2->CCR = 0;
+    for (i = 0; i < 100; i++) asm("nop");
+    
     __Clear_Screen(0b0000000000011111);
     
     __Set(BEEP_VOLUME, 0);
@@ -108,7 +105,6 @@ void _HardFaultException()
     puthex((char*) &(SCB->CFSR), sizeof(SCB->CFSR));
     
     putstring("\nSTACK DUMP:\n");
-    int i;
     for (i = 0; i < 32; i++)
     {
         puthex((char*) (sp + i), sizeof(void*));
@@ -147,48 +143,4 @@ void USB_HP_CAN_TX_IRQHandler(void)
 void USB_LP_CAN_RX0_IRQHandler(void)
 {
   __USB_Istr();
-}
-
-void TIM3_IRQHandler(void)
-{ 
-//  static char tmp[2] = {'A', 0};
-  u8 KeyCode;
-  vu32Tick++;
-  __Set(KEY_IF_RST, 0);                      //Clear TIM3 interrupt flag
-  
-  if(Delay_Cnt > 0) Delay_Cnt--;
-  
-  if(Cnt_mS > 0)
-      Cnt_mS--;
-  else {                                     //Read keys per 20mS
-    Cnt_mS =20;
-    if(Wait_Cnt >0)  Wait_Cnt--;
-    if(Beep_mS >=20)  Beep_mS   -= 20;
-    else              __Set(BEEP_VOLUME, 0); // Beep off
-    if(Cnt_20mS < 50) Cnt_20mS++;
-    else {                                   // Do it pre sec.
-      Cnt_20mS = 0;
-      __Set(BETTERY_DT, 1);                  //Battery Detect
-      Sec_Cnt++;
-      if(PD_Cnt > 0) PD_Cnt--;
-    }
-    Cursor_Cnt++;
-    if(Cursor_Cnt >= 12) {                   //12*20mS=240mS
-//	  __Display_Str(0, 0, 0x8888, 0, tmp);
-//	  if (++tmp[0] > 'Z')
-//		tmp[0] = 'A';
-
-      Cursor_Cnt=0;
-      Twink=!Twink;
-      Blink = 1;
-    }
-    if(Key_Wait_Cnt)    Key_Wait_Cnt--;
-    if(Key_Repeat_Cnt)  Key_Repeat_Cnt--;
-    KeyCode=0;//Read_Keys();
-    if(KeyCode !=0) {
-      Key_Buffer = KeyCode;
-      //__Set(BEEP_VOLUME, 5*(Title[VOLUME][CLASS].Value-1));// Volume
-      Beep_mS = 60; 
-    }
-  }
 }

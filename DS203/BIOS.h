@@ -220,15 +220,90 @@ extern T_attr *T_Attr;
  
  void __LCD_Initial(void);
  void __Clear_Screen(u16 Color);
- void __Point_SCR(u16 x0, u16 y0);
+ 
+ // Seems like we need a bit of delay around the RS changes
+static void LCD_DELAY()
+{
+    int i;
+    for (i = 0; i < 10; i++)
+        asm("nop");
+}
+
+#define always_read(x) asm(""::"r"(x))
+#define LCD_RS_LOW()      GPIOD->BRR  = (1<<12)
+#define LCD_RS_HIGH()     GPIOD->BSRR = (1<<12)
+#define LCD_TYPE_ILI9327 0x02049327
+  
  void __LCD_SetPixl(u16 Color);
  u16  __LCD_GetPixl(void);  
  u16  __Get_TAB_8x14(u8 Code, u16 Row);
  void __LCD_Set_Block(u16 x1, u16 x2, u16 y1, u16 y2);
  
- void __LCD_Copy(uc16 *pBuffer, u16  NumPixel); // Send a row data to LCD
+ // Wait LCD data DMA ready
+ static void __LCD_DMA_Ready(void)
+ {
+    while ((DMA1_Channel2->CCR & 1) && DMA1_Channel2->CNDTR != 0);
+ }
+ 
+ // Send a row data to LCD
+ static void __LCD_Copy(uc16 *pBuffer, u16  NumPixel)
+ {
+    __LCD_DMA_Ready();
+     
+    // Due to CPU bug in STM32F103, we cannot access FSMC from both DMA1
+    // and DMA2 at the same time. Therefore we use DMA1 instead of the DMA2 used by BIOS.
+    DMA1_Channel2->CCR = 0x5590;
+    DMA1_Channel2->CMAR = (uint32_t)pBuffer;
+    DMA1_Channel2->CNDTR = NumPixel;
+    DMA1_Channel2->CPAR = 0x60000000;
+    DMA1_Channel2->CCR = 0x5591;
+ }
+
+ static void LCD_WR_Ctrl(u16 Reg) 
+{
+    __LCD_DMA_Ready();
+    LCD_DELAY();
+    LCD_RS_LOW();
+    __LCD_Copy(&Reg, 1);
+    __LCD_DMA_Ready();
+    LCD_DELAY();
+    LCD_RS_HIGH();
+}
+
+static void LCD_WR_REG(u16 Reg, u16 Data) 
+{
+    __LCD_DMA_Ready();
+    LCD_DELAY();
+    LCD_RS_LOW();
+    __LCD_Copy(&Reg, 1);
+    __LCD_DMA_Ready();
+    LCD_DELAY();
+    LCD_RS_HIGH();
+    __LCD_Copy(&Data, 1);
+    __LCD_DMA_Ready();
+    LCD_DELAY();
+}
+
+ static void __Point_SCR(u16 x0, u16 y0)
+ {
+     __LCD_DMA_Ready();
+     LCD_WR_Ctrl(0x2A);
+     uint16_t buffer[4] = {
+         0, (uint16_t)(y0 & 0xFF), 0, 0xEF
+     };
+     __LCD_Copy(buffer, 4);
+     LCD_WR_Ctrl(0x2B);
+     uint16_t buffer2[4] = {
+         (uint16_t)(x0 >> 8),
+         (uint16_t)(x0 & 0xFF),
+         399 >> 8,
+         399 & 0xFF
+     };
+     __LCD_Copy(buffer2, 4);
+     LCD_WR_Ctrl(0x2C);
+ }
+ 
  void __LCD_Fill(u16 *pBuffer,u16 NumPixel);    // Fill number of pixel by DMA 
- void __LCD_DMA_Ready(void);                    // Wait LCD data DMA ready
  
  void __Row_Copy(uc16 *S_Buffer,u16 *T_Buffer); // Copy one row base data to buffer
  void __Row_DMA_Ready(void);                    // Wait row base data DMA ready

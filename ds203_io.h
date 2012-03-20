@@ -17,18 +17,12 @@ void crash_with_message(const char *message, void *caller);
 int lcd_printf(u16 x0, u16 y0, u16 color, u8 mode, const char *fmt, ...)
 __attribute__ ((format (printf, 5, 6)));;
 
-// Shorthand function for printing debug messages. Always writes on the bottom
-// row of the screen.
-#define debugf(...) lcd_printf(0, 0, 0xFFFF, 0, __VA_ARGS__)
-
-// Helper function for clearing a text row before printing.
-#define clearline(y0) lcd_printf(0, y0, 0, 0, "                                                                       ")
 
 // Show single-line selection menu with given choices.
 // Returns index 0...n of the selected item.
 // The last item given must be NULL to terminate the list.
 // E.g. int choice = show_menu(0, 0, 0xFFFF, "Select:", "Duck", "Cat", NULL);
-int show_menu(u16 x0, u16 y0, u16 color, const char *prompt, ...);
+// int show_menu(u16 x0, u16 y0, u16 color, const char *prompt, ...);
 
 /* ------------- Graphics ---------------- */
 
@@ -79,9 +73,4 @@ char *select_filename(const char *format);
 // You can add the colours you use to the list in ds203_io.c to make
 // the result look better.
 bool write_bitmap(const char *filename);
-
-/* ----------- Miscellaneous ----------- */
-
-// Delay specified number of milliseconds.
-void DelayMs(u16 ms);
 

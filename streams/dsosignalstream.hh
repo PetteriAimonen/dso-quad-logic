@@ -54,6 +54,8 @@ public:
     
     virtual DSOSignalStream* clone() const;
     
+    static const int frequency = 500000;
+    
 private:
     size_t read_pos; // Next position to be read
     SignalEvent previous_event; // Event immediately before read_pos (old_levels is not valid)

@@ -1,6 +1,8 @@
 #pragma once
 
 #define abs(x) (((x)>0) ? (x) : -(x))
+#define MAX(x,y) ((x) > (y) ? (x) : (y))
+#define MIN(x,y) ((x) < (y) ? (x) : (y))
 
 // Integer division, return ceiling of the result.
 static inline uint32_t div_round_up(uint32_t x, uint32_t y)

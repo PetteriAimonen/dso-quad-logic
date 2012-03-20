@@ -71,17 +71,17 @@ __LCD_Set_Block :
 //===============================================================================
 // void __LCD_DMA_Ready(void)  Wait LCD data DMA ready
 //-------------------------------------------------------------------------------
-  .globl  __LCD_DMA_Ready 
+/*  .globl  __LCD_DMA_Ready 
 .thumb_func
     . = BIOS + 0x21
-__LCD_DMA_Ready :
+__LCD_DMA_Ready :*/
 //===============================================================================
 // void __LCD_Copy(uc16 *pBuffer, u16 NumPixel)  Send a row data to LCD
 //-------------------------------------------------------------------------------
-  .globl  __LCD_Copy
+  /*.globl  __LCD_Copy
 .thumb_func
     . = BIOS + 0x25
-__LCD_Copy:
+__LCD_Copy:*/
 //===============================================================================
 // void __LCD_Fill(u16  *pBuffer, u16 NumPixel)  Fill number of pixel by DMA 
 //-------------------------------------------------------------------------------

@@ -6,6 +6,14 @@
 #include "Interrupt.h"
 #include <stdio.h>
 #include "mathutils.h"
+#include "lcd.h"
+
+// Shorthand function for printing debug messages. Always writes on the bottom
+// row of the screen.
+#define debugf(...) lcd_printf(0, 0, 0xFFFF, 0, __VA_ARGS__)
+
+// Helper function for clearing a text row before printing.
+#define clearline(y0) lcd_printf(0, y0, 0, 0, "                                                                       ")
 
 /* ---- LCD drawing ---- */
 
@@ -26,6 +34,9 @@ void crash_with_message(const char *message, void *caller)
     asm("mov %0, sp" : "=r"(CRASHDATA.SP) : :);
     asm("mov %0, r7" : "=r"(CRASHDATA.R7) : :);
     memcpy(CRASHDATA.BUILDID, BUILDID, sizeof(BUILDID));
+    
+    DMA1_Channel4->CCR = DMA1_Channel2->CCR = 0;
+    for (int i = 0; i < 100; i++) asm("nop");
     
     __Clear_Screen(0b0000000000011111);
     __Set(BEEP_VOLUME, 0);
@@ -77,50 +88,6 @@ int lcd_printf(u16 x0, u16 y0, u16 color, u8 mode, const char *fmt, ...)
     
     __Display_Str(x0, y0, color, mode, (u8*)buffer);
     return rv;
-}
-
-// Show a single-line menu of selections and loop until user makes a selection
-int show_menu(u16 x0, u16 y0, u16 color, const char *prompt, ...)
-{
-    va_list va;
-    int current_selection = 0;
-    while(1)
-    {
-        clearline(y0);
-        __Display_Str(x0, y0, color, 0, (u8*)prompt);
-        
-        int item_count = 0;
-        int x = x0 + strlen(prompt) * FONT_WIDTH + 16;
-        const char *choice;
-        va_start(va, prompt);
-        while ((choice = va_arg(va, const char *)) != NULL)
-        {
-            int mode = (item_count == current_selection) ? 1 : 0;
-            __Display_Str(x, y0, color, mode, (u8*)choice);
-            x += strlen(choice) * FONT_WIDTH + 16;
-            item_count++;
-        }
-        va_end(va);
-
-        DelayMs(100);
-        
-        // Wait until key is pressed
-        int key;
-        do {
-            key = __Get(KEY_STATUS) ^ ALL_KEYS;
-        } while (!(key & (K_ITEM_D_STATUS | K_ITEM_S_STATUS | K_ITEM_I_STATUS)));
-        
-        // Wait for key to release
-        while (__Get(KEY_STATUS) ^ ALL_KEYS);
-        DelayMs(100);
-        
-        if ((key & K_ITEM_D_STATUS) && current_selection > 0)
-            current_selection--;
-        else if ((key & K_ITEM_I_STATUS) && current_selection < item_count - 1)
-            current_selection++;
-        else if (key & K_ITEM_S_STATUS)
-            return current_selection;
-    }
 }
 
 // Alpha-blend two colors together, helper for drawline.
@@ -401,6 +368,12 @@ static uint16_t palette[16] = {
 // Comparing in HSV space would be more accurate but slower.
 int quantize(uint16_t color)
 {
+    for (int i = 0; i < 16; i++)
+    {
+        if (color == palette[i])
+            return i;
+    }
+    
     int min_delta = 999999;
     int closest = 0;
     for (int i = 0; i < 16; i++)
@@ -466,27 +439,14 @@ bool write_bitmap(const char *filename)
     {
         for (int x = 0; x < 400; x += 2)
         {
-            __Point_SCR(x, y);
-            int colorH = quantize(__LCD_GetPixl());
-            __Point_SCR(x + 1, y);
-            int colorL = quantize(__LCD_GetPixl());
+            int colorH = quantize(lcd_getpixel(x, y));
+            int colorL = quantize(lcd_getpixel(x + 1, y));
             
             _fputc((colorH << 4) | colorL);
         }
     }
     
     return _fclose();
-}
-
-
-/* ---- Misc ---- */
-
-// Waits for the specified number of milliseconds
-void DelayMs(u16 ms)
-{
-    // The count is decremented in an interrupt
-    Delay_Cnt = ms;
-    while (Delay_Cnt > 0);
 }
 
 

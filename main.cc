@@ -10,6 +10,8 @@ extern "C" {
 #include "mathutils.h"
 #include "Interrupt.h"
 #include "irq.h"
+#include "buttons.h"
+#include "lcd.h"
 }
 
 #include "dsosignalstream.hh"
@@ -20,10 +22,13 @@ extern "C" {
 #include "breaklines.hh"
 #include "window.hh"
 #include "cursor.hh"
+#include "timemeasure.hh"
 #include "grid.hh"
 
-// For some reason, the headers don't have this register
+// For some reason, the headers don't have these registers
+#define FSMC_BCR1   (*((vu32 *)(0xA0000000+0x00)))
 #define FSMC_BTR1   (*((vu32 *)(0xA0000000+0x04)))
+#define FSMC_BCR2   (*((vu32 *)(0xA0000008+0x00)))
 #define FSMC_BTR2   (*((vu32 *)(0xA0000008+0x04)))
 
 // GPIOC->BSRR values to toggle GPIOC5
@@ -86,7 +91,7 @@ process_samples(const uint32_t *data)
         // Just a sanity-check
         if (*data & 0xFF000000)
         {
-            debugf("Too bad, lost the H_L sync %08lx at %lu ", *data, (uint32_t) count);
+            crash_with_message("Lost the H_L sync", __builtin_return_address(0));
             while(1);
         }
         
@@ -129,7 +134,9 @@ void __irq__ DMA1_Channel4_IRQHandler()
 {
     if (DMA1->ISR & DMA_ISR_TEIF4)
     {
-        debugf("Oh noes: DMA channel 4 transfer error!");
+        crash_with_message("Oh noes: DMA channel 4 transfer error!",
+            __builtin_return_address(0)
+        );
         while(1);
     }
     else if (DMA1->ISR & DMA_ISR_HTIF4)
@@ -138,7 +145,7 @@ void __irq__ DMA1_Channel4_IRQHandler()
         DMA1->IFCR = DMA_IFCR_CHTIF4;
         if (DMA1->ISR & DMA_ISR_TCIF4)
         {
-            debugf("Oh noes: ADC fifo overflow in HTIF");
+            crash_with_message("Oh noes: ADC fifo overflow in HTIF", __builtin_return_address(0));
             while(1);
         }
     }
@@ -148,7 +155,7 @@ void __irq__ DMA1_Channel4_IRQHandler()
         DMA1->IFCR = DMA_IFCR_CTCIF4;
         if (DMA1->ISR & DMA_ISR_HTIF4)
         {
-            debugf("Oh noes: ADC fifo overflow in TCIF");
+            crash_with_message("Oh noes: ADC fifo overflow in TCIF", __builtin_return_address(0));
             while(1);
         }
     }
@@ -209,10 +216,7 @@ void start_capture()
     // Reduce the wait states of the FPGA & LCD interface
     FSMC_BTR1 = 0x10100110;
     FSMC_BTR2 = 0x10100110;
-    
-    // Downgrade the LCD transfer priority to medium
-    DMA1_Channel1->CCR &= ~DMA_CCR1_PL_1;
-    DMA1_Channel2->CCR &= ~DMA_CCR1_PL_1;
+    FSMC_BCR1 |= FSMC_BCR1_CBURSTRW;
     
     // Clear any pending interrupts for ch 4
     DMA1->IFCR = 0x0000F000;
@@ -236,7 +240,7 @@ void draw_screen(const std::vector<Drawable*> &objs, int startx, int endx)
         d->Prepare(startx, endx);
     }
     
-    __Point_SCR(startx, 0);
+    lcd_set_location(startx, 0);
     for (int x = startx; x < endx; x++)
     {
         uint16_t *buffer = (x % 2) ? buffer1 : buffer2;
@@ -247,8 +251,7 @@ void draw_screen(const std::vector<Drawable*> &objs, int startx, int endx)
             d->Draw(buffer, screenheight, x);
         }
         
-        __LCD_DMA_Ready();
-        __LCD_Copy(buffer, screenheight);
+        lcd_write_dma(buffer, screenheight);
     }
 }
 
@@ -256,10 +259,26 @@ void draw_screen(const std::vector<Drawable*> &objs, int startx, int endx)
 DECLARE_GPIO(usart1_tx, GPIOA, 9);
 DECLARE_GPIO(usart1_rx, GPIOA, 10);
 
+void show_status(const std::vector<Drawable*> &screenobjs, TextDrawable &statustext, const char *fmt, ...)
+{
+    char buffer[50];
+    va_list va;
+    va_start(va, fmt);
+    int rv = vsnprintf(buffer, sizeof(buffer), fmt, va);
+    va_end(va);
+    
+    statustext.set_text(buffer);
+    
+    draw_screen(screenobjs, 0, 400);
+}
+
 int main(void)
 {   
     __Set(BEEP_VOLUME, 0);
     __Display_Str(80, 50, RGB565RGB(0,255,0), 0, (u8*)"Logic Analyzer (c) 2012 jpa");
+    
+    lcd_init();
+    lcd_printf(80, 34, RGB565RGB(0,255,0), 0, "LCD TYPE %08lx", LCD_TYPE);
     
     // USART1 8N1 115200bps debug port
     RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
@@ -289,7 +308,8 @@ int main(void)
     __Read_FIFO();
     
     while (~__Get(KEY_STATUS) & ALL_KEYS);
-    DelayMs(500); // Wait for ADC to settle
+    get_keys(ANY_KEY);
+    delay_ms(500); // Wait for ADC to settle
     
     start_capture();
     
@@ -331,6 +351,10 @@ int main(void)
     breaklines.y1 = 180;
     graphwindow.items.push_back(&breaklines);
     
+    TimeMeasure timemeasure(&xpos);
+    timemeasure.linecolor = 0xFF00;
+    graphwindow.items.push_back(&timemeasure);
+    
     Cursor cursor(&xpos);
     cursor.linecolor = 0x00FF;
     graphwindow.items.push_back(&cursor);
@@ -352,47 +376,36 @@ int main(void)
     statustext.valign = TextDrawable::BOTTOM;
     screenobjs.push_back(&statustext);
     
-    int moves = 0;
-    uint32_t old_keys = 0;
-    
     while(1) {
         xpos.set_zoom(xpos.get_zoom());
         
-        // Report some status
-        char buffer[50];
         size_t free_bytes, largest_block;
         get_malloc_memory_status(&free_bytes, &largest_block);
-        snprintf(buffer, sizeof(buffer), "Capture buffer: %2ld %%  Free RAM: %4d B",
-                 div_round(signal_buffer.bytes * 100, sizeof(signal_buffer.storage)),
+        
+        // Show_status also redraws the screen.
+        // Yeah yeah, I know it's ugly.
+        show_status(screenobjs, statustext,
+                    "Position: %u us  Buffer: %2ld %%  RAM: %4d B",
+                 (unsigned)(xpos.get_xpos() * 1000000 / DSOSignalStream::frequency),
+                    div_round(signal_buffer.bytes * 100, sizeof(signal_buffer.storage)),
                  free_bytes);
-        statustext.set_text(buffer);
         
-        draw_screen(screenobjs, 0, 400);
+        uint32_t start = get_time();
+        uint32_t keys;
+        while (!(keys = get_keys(ANY_KEY)) && (get_time() - start) < 100);
         
-        uint32_t keys = 0;
-        int count = 0;
-        while (!(keys & ALL_KEYS) && count++ < 100)
-        {
-            DelayMs(10);
-            keys = ~__Get(KEY_STATUS);
-            
-            if (!(keys & ALL_KEYS))
-                moves = 0;
-        }
-        
-        if (keys & KEY1_STATUS)
+        if (keys & BUTTON1)
         {
             start_capture();
             xpos.set_xpos(0);
         }
         
-        if (keys & KEY2_STATUS)
+        if (keys & BUTTON2)
         {
-            clearline(0);
             stream.seek(0);
             
             char *name = select_filename("waves%03d.vcd");
-            debugf("Writing data to %s ", name);
+            show_status(screenobjs, statustext, "Writing data to %s ", name);
             
             _fopen_wr(name);
             _fprintf("$version DSO Quad Logic Analyzer $end\n");
@@ -418,43 +431,39 @@ int main(void)
             
             _fprintf("#%lu\n", (uint32_t)event.end);
             
-            clearline(0);
             if (_fclose())
             {
-                debugf("%s successfully written", name);
+                show_status(screenobjs, statustext, "%s successfully written", name);
             }
             else
             {
-                debugf("Failed to write file.");
+                show_status(screenobjs, statustext, "Failed to write file.");
             }
             
-            DelayMs(3000);
+            delay_ms(3000);
         }
         
-        if (keys & KEY3_STATUS)
+        if (keys & BUTTON3)
         {
-            clearline(0);
             char *name = select_filename("logic%03d.bmp");
-            debugf("Writing screenshot to %s ", name);
+            show_status(screenobjs, statustext, "Writing screenshot to %s ", name);
             
             if (write_bitmap(name))
             {
-                clearline(0);
-                debugf("Wrote %s successfully!", name);
+                show_status(screenobjs, statustext, "Wrote %s successfully!", name);
             }
             else
             {
-                clearline(0);
-                debugf("Bitmap write failed.");
+                show_status(screenobjs, statustext, "Bitmap write failed.");
             }
             
-            DelayMs(3000);
+            delay_ms(3000);
         }
         
-        if (keys & KEY4_STATUS)
+        if (keys & BUTTON4)
         {
             // Holding the button for 5 seconds initiates memory dump
-            DelayMs(5000);
+            delay_ms(5000);
             
             keys = ~__Get(KEY_STATUS);
             if (keys & KEY4_STATUS)
@@ -464,39 +473,23 @@ int main(void)
             }
         }
         
-        if ((keys & (K_ITEM_D_STATUS | K_ITEM_I_STATUS))
-            && keys == old_keys)
-            moves++;
-        else
-            moves = 0;
-        old_keys = keys;
-        
-        int move_speed = 1;
-        if (moves > 50)
-            move_speed = 20;
-        else if (moves > 10)
-            move_speed = 10;
-        else if (moves > 5)
-            move_speed = 5;
-        else if (moves > 2)
-            move_speed = 2;
-        
-        if (keys & K_ITEM_D_STATUS)
-            xpos.move_xpos(-move_speed);
+        if (keys & SCROLL2_LEFT)
+            xpos.move_xpos(-scroller_speed());
 
-        if (keys & K_ITEM_I_STATUS)
-            xpos.move_xpos(move_speed);
+        if (keys & SCROLL2_RIGHT)
+            xpos.move_xpos(scroller_speed());
+        
+        if (keys & SCROLL2_PRESS)
+        {
+           timemeasure.Click();
+        }
         
         int zoom = xpos.get_zoom();
-        if ((keys & K_INDEX_D_STATUS) && zoom > -30)
+        if ((keys & SCROLL1_LEFT) && zoom > -30)
             xpos.set_zoom(zoom - 1);
         
-        if ((keys & K_INDEX_I_STATUS) && zoom < 3)
+        if ((keys & SCROLL1_RIGHT) && zoom < 3)
             xpos.set_zoom(zoom + 1);
-
-        printf("XPOS %lu\n", (uint32_t)xpos.get_xpos());
-        
-        while (~__Get(KEY_STATUS) & (ALL_KEYS ^ K_ITEM_D_STATUS ^ K_ITEM_I_STATUS));
     }
     
     return 0;
