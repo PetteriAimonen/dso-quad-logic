@@ -404,7 +404,7 @@ int main(void)
         {
             stream.seek(0);
             
-            char *name = select_filename("waves%03d.vcd");
+            char *name = select_filename("WAVES%03d.VCD");
             show_status(screenobjs, statustext, "Writing data to %s ", name);
             
             _fopen_wr(name);
@@ -445,7 +445,7 @@ int main(void)
         
         if (keys & BUTTON3)
         {
-            char *name = select_filename("logic%03d.bmp");
+            char *name = select_filename("LOGIC%03d.BMP");
             show_status(screenobjs, statustext, "Writing screenshot to %s ", name);
             
             if (write_bitmap(name))
