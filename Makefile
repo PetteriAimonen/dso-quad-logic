@@ -58,11 +58,11 @@ clean:
 $(NAME).HEX: build/$(NAME).elf
 	$(CP) -O ihex $< $@
 
-build/$(NAME).elf: ${_OBJS}
+build/$(NAME).elf: ${_OBJS} baselibc/libc.a
 	$(CXX) $(CFLAGS) $(CXXFLAGS) $(LFLAGS) -o $@ ${_OBJS} ${LIBS}
 
 # Rebuild all objects if a common header changes
-$(_OBJS): DS203/*.h Makefile
+$(_OBJS): DS203/*.h Makefile dependencies
 
 # C files
 
@@ -75,9 +75,6 @@ build/%.o: DS203/%.c
 build/%.o: DS203/%.S
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-build/%.o: libfixmath/%.c
-	$(CC) $(CFLAGS) -DFIXMATH_NO_CACHE -c -o $@ $<
-
 # C++ files
 
 build/%.o: gui/%.cc gui/*.hh streams/*.hh
@@ -88,6 +85,29 @@ build/%.o: streams/%.cc gui/*.hh streams/*.hh
 
 build/%.o: %.cc gui/*.hh streams/*.hh
 	$(CXX) $(CFLAGS) $(CXXFLAGS) -c -o $@ $<
+
+# Dependencies
+
+baselibc/libc.a: baselibc/Makefile
+	make -C baselibc
+
+baselibc: baselibc.tar.gz
+	tar xzf baselibc.tar.gz
+	touch baselibc
+
+build/%.o: libfixmath/%.c
+	$(CC) $(CFLAGS) -DFIXMATH_NO_CACHE -c -o $@ $<
+
+libfixmath/%: libfixmath
+
+libfixmath:
+	tar xzf libfixmath.tar.gz
+	touch libfixmath 
+
+build:
+	mkdir -p build
+
+dependencies: baselibc libfixmath build
 
 # Installing
 
