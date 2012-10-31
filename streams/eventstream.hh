@@ -8,6 +8,8 @@ typedef int64_t signaltime_t;
 
 struct Event
 {
+    virtual ~Event() {}
+
     signaltime_t start; // Absolute time in ticks for the beginning of the event
     signaltime_t end; // Absolute time for end of the event (same as begin if the event doesn't have a length)
     
