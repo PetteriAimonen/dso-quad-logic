@@ -56,7 +56,7 @@ static void puthex(const char *p, int count)
 static void **sp;
 register void **PSP asm("sp");
 
-void _HardFaultException();
+void _HardFaultException() __attribute__((noreturn));
 void HardFaultException(void) __attribute__((noreturn, naked));
 void HardFaultException()
 {
