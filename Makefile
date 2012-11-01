@@ -8,7 +8,8 @@ NAME = LOGICAPP
 OBJS = main.o ds203_io.o dsosignalstream.o \
 xposhandler.o textdrawable.o signalgraph.o \
 breaklines.o cursor.o window.o grid.o timemeasure.o \
-cxxglue.o libc_glue.o fix16.o fix16_exp.o lcd.o buttons.o
+cxxglue.o libc_glue.o fix16.o fix16_exp.o lcd.o buttons.o \
+menudrawable.o
 
 # Linker script (choose which application position to use)
 LFLAGS  = -L linker_scripts -T app3.lds

@@ -26,6 +26,7 @@ public:
     virtual ~TextDrawable() {};
     
     void set_text(const char *str);
+    int text_width();
     
     virtual void Draw(uint16_t buffer[], int screenheight, int x);
     

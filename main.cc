@@ -24,6 +24,12 @@ extern "C" {
 #include "cursor.hh"
 #include "timemeasure.hh"
 #include "grid.hh"
+#include "menudrawable.hh"
+ 
+//define some colors
+#define WHITE   0xFFFF
+#define BLACK   0x0000
+#define GREY    0x8410
 
 // For some reason, the headers don't have these registers
 #define FSMC_BCR1   (*((vu32 *)(0xA0000000+0x00)))
@@ -39,6 +45,14 @@ static uint32_t adc_fifo[256];
 #define ADC_FIFO_HALFSIZE (sizeof(adc_fifo) / sizeof(uint32_t) / 2)
 
 struct signal_buffer_t signal_buffer = {0, 0};
+
+enum menu1_entry {ENTRY_MEMORY_DUMP = 4, 
+                 ENTRY_NORMAL_SCROLL = 0, 
+                 ENTRY_TRANSIENT_SCROLL = 1};
+                 
+enum scroll_mode_enum {NORMAL_SCROLL, TRANSIENT_SCROLL};
+
+scroll_mode_enum scroll_mode;
 
 // This function is the hotspot of the whole capture process.
 // It compares the samples until it finds an edge.
@@ -272,6 +286,27 @@ void show_status(const std::vector<Drawable*> &screenobjs, TextDrawable &statust
     draw_screen(screenobjs, 0, 400);
 }
 
+void menu_click(int index, MenuDrawable *menu)
+{
+    if (index == ENTRY_MEMORY_DUMP)  //do a memory dump
+    {
+        crash_with_message("User-initiated memory dump",
+                            __builtin_return_address(0));
+    }
+    else if (index == ENTRY_NORMAL_SCROLL)
+    {
+        menu->setColor(0, WHITE);
+        menu->setColor(1, GREY);
+        scroll_mode = NORMAL_SCROLL;
+    }
+    else if (index == ENTRY_TRANSIENT_SCROLL)
+    {
+        menu->setColor(0, GREY);
+        menu->setColor(1, WHITE);
+        scroll_mode = TRANSIENT_SCROLL;
+    }
+}
+
 int main(void)
 {   
     __Set(BEEP_VOLUME, 0);
@@ -316,6 +351,7 @@ int main(void)
     DSOSignalStream stream(&signal_buffer);
     XPosHandler xpos(400, stream);
     
+    //init gui
     std::vector<Drawable*> screenobjs;
     Window graphwindow(64, 0, 400, 240);
     screenobjs.push_back(&graphwindow);
@@ -371,10 +407,32 @@ int main(void)
     button3txt.invert = true;
     screenobjs.push_back(&button3txt);
     
+    TextDrawable button4txt(180, 240, " SETTINGS ");
+    button4txt.invert = true;
+    screenobjs.push_back(&button4txt);
+    
+    MenuDrawable menu1(180,116,5);
+    menu1.setText(0,"Normal Scroll");
+    menu1.setColor(0, WHITE);
+    menu1.setText(1,"Trans. Scroll");
+    menu1.setColor(1, GREY);
+    menu1.setSeparator(1,true);
+    menu1.setText(2,"Selected");
+    menu1.setColor(2, WHITE);
+    menu1.setText(3,"Not Selected");
+    menu1.setColor(3, GREY);
+    menu1.setSeparator(3, true);
+    menu1.setText(4,"Memory Dump");
+    menu1.index = 2;
+    menu1.visible = false;
+    screenobjs.push_back(&menu1);
+        
     TextDrawable statustext(390, 0, "");
     statustext.halign = TextDrawable::RIGHT;
     statustext.valign = TextDrawable::BOTTOM;
     screenobjs.push_back(&statustext);
+    
+    scroll_mode = NORMAL_SCROLL;
     
     while(1) {
         xpos.set_zoom(xpos.get_zoom());
@@ -462,27 +520,69 @@ int main(void)
         
         if (keys & BUTTON4)
         {
-            // Holding the button for 5 seconds initiates memory dump
-            delay_ms(5000);
-            
-            keys = ~__Get(KEY_STATUS);
-            if (keys & KEY4_STATUS)
-            {
-                crash_with_message("User-initiated memory dump",
-                                   __builtin_return_address(0));
-            }
+           // toggle the menu
+            menu1.visible = !menu1.visible;
         }
         
         if (keys & SCROLL2_LEFT)
-            xpos.move_xpos(-scroller_speed());
-
+        {
+            if (menu1.visible)
+            {
+                menu1.previous();
+            }
+            else    //scroll
+            {
+                if (scroll_mode == NORMAL_SCROLL)
+                {
+                    xpos.move_xpos(-scroller_speed());
+                } 
+                else if (scroll_mode == TRANSIENT_SCROLL)
+                {
+                    SignalEvent event;
+                    int offset;
+                    signaltime_t center_time = xpos.get_xpos();
+                    stream.seek(center_time);
+                    stream.read_backwards(event);
+                    xpos.set_xpos(event.start);
+                }
+            }
+        }
+        
         if (keys & SCROLL2_RIGHT)
-            xpos.move_xpos(scroller_speed());
+        {
+            if (menu1.visible)
+            {
+                menu1.next();
+            }
+            else    //scroll
+            {
+                if (scroll_mode == NORMAL_SCROLL)
+                {
+                    xpos.move_xpos(scroller_speed());
+                }
+                else if (scroll_mode == TRANSIENT_SCROLL)
+                {
+                    SignalEvent event;
+                    int offset;
+                    signaltime_t center_time = xpos.get_xpos();
+                    stream.seek(center_time);
+                    stream.read_forwards(event);
+                    xpos.set_xpos(event.end);
+                }
+            }
+        }
         
         if (keys & SCROLL2_PRESS)
         {
-           timemeasure.Click();
-        }
+            if (menu1.visible)
+            {
+                menu_click(menu1.index, &menu1);
+            }
+            else
+            {
+                timemeasure.Click();
+            }
+         }
         
         int zoom = xpos.get_zoom();
         if ((keys & SCROLL1_LEFT) && zoom > -30)

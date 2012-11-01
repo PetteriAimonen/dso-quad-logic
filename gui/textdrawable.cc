@@ -20,6 +20,11 @@ void TextDrawable::set_text(const char *str)
     this->str.reset((const char*)copy);
 }
 
+int TextDrawable::text_width()
+{
+    return len*FONT_WIDTH;
+}
+
 void TextDrawable::Draw(uint16_t buffer[], int screenheight, int x)
 {
     int width = len * FONT_WIDTH;
