@@ -19,4 +19,7 @@ public:
     
     // Render the vertical line at x to buffer
     virtual void Draw(uint16_t buffer[], int screenheight, int x) = 0;
+    
+    Drawable() {}
+    Drawable(Drawable &&) = default;
 };

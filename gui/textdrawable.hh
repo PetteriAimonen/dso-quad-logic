@@ -37,6 +37,7 @@ public:
     uint16_t color; // Default: White
     bool invert; // Default: false
     
+    TextDrawable(TextDrawable &&) = default;
 private:
     std::unique_ptr<const char[]> str;
     size_t len;

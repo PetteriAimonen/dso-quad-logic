@@ -53,7 +53,9 @@ SECTIONS
     
     .dummy (NOLOAD) : {
          /* We don't need no stinking exceptions */
+        __exidx_start = .;
         *(.ARM.exidx*)
+        __exidx_end = .;
     }
   }  
 /*========== end of file ==========*/

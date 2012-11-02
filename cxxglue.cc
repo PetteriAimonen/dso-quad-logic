@@ -27,6 +27,12 @@ namespace std {
     }
 }
 
+void abort(void)
+{
+    crash_with_message("abort", __builtin_return_address(0));
+    while(1);
+}
+
 #include <stdlib.h>
 
 void * operator new(size_t n)
