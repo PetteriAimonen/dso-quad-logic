@@ -1,0 +1,59 @@
+set_io clk 15
+set_io rst_n 62
+
+set_io PB0 63
+set_io PB1 60
+set_io PA2 72
+set_io PA3 71
+set_io PC4 65
+set_io PC5 64
+
+set_io adc_mode 1
+set_io adc_sleep 2
+
+set_io spi_sck 69
+set_io spi_miso 68
+set_io spi_mosi 66
+
+set_io fsmc_ce 27
+set_io fsmc_nwr 28
+set_io fsmc_nrd 29
+set_io fsmc_db\[15\] 36
+set_io fsmc_db\[14\] 37
+set_io fsmc_db\[13\] 40
+set_io fsmc_db\[11\] 41
+set_io fsmc_db\[12\] 42
+set_io fsmc_db\[10\] 51
+set_io fsmc_db\[9\] 52
+set_io fsmc_db\[8\] 53
+set_io fsmc_db\[7\] 54
+set_io fsmc_db\[6\] 56
+set_io fsmc_db\[5\] 57
+set_io fsmc_db\[4\] 59
+set_io fsmc_db\[3\] 20
+set_io fsmc_db\[2\] 30
+set_io fsmc_db\[1\] 33
+set_io fsmc_db\[0\] 34
+
+set_io cha_clk 81
+set_io cha_din\[7\] 83
+set_io cha_din\[6\] 85
+set_io cha_din\[5\] 82
+set_io cha_din\[4\] 86
+set_io cha_din\[3\] 87
+set_io cha_din\[2\] 78
+set_io cha_din\[1\] 80
+set_io cha_din\[0\] 79
+
+set_io chb_clk 100
+set_io chb_din\[7\] 99
+set_io chb_din\[6\] 97
+set_io chb_din\[5\] 96
+set_io chb_din\[4\] 95
+set_io chb_din\[3\] 94
+set_io chb_din\[2\] 93
+set_io chb_din\[1\] 91
+set_io chb_din\[0\] 90
+
+set_io chc_din 24
+set_io chd_din 25
