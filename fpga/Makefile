@@ -1,4 +1,4 @@
-VHDL_SOURCE = fifo.vhdl config.vhdl delay.vhdl fpga_top.vhdl
+VHDL_SOURCE = fifo.vhdl rle_coder.vhdl config.vhdl delay.vhdl fpga_top.vhdl
 
 all: syntax_check run_tbs
 

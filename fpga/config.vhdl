@@ -22,6 +22,8 @@ end entity;
 architecture rtl of Config is
     signal config_r: std_logic_vector(15 downto 0);
 begin
+    cfg_read_count <= config_r(0);
+
     process(clk, rst_n)
     begin
         if rst_n = '0' then

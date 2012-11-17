@@ -51,13 +51,18 @@ architecture rtl of fpga_top is
     
     -- Output data bus
     signal output_data:         std_logic_vector(15 downto 0);
+    
+    -- FSMC read signal (to detect edges)
+    signal fsmc_nrd_r:          std_logic;
+    signal fsmc_nrd_edge:       std_logic;
 begin
     -- ADC is clocked directly from 72 MHz output from the STM32
+    adc_sleep <= '1';
     cha_clk <= clk;
     chb_clk <= clk;
     
     -- Digital data is delayed to align it with ADC data
-    ch_cd_in <= chc_din & chd_din;
+    ch_cd_in <= chd_din & chc_din;
     ch_abcd(3 downto 2) <= ch_cd_delayed;
     delay1: entity work.Delay
         generic map (width_g => 2, delay_g => 5)
@@ -70,8 +75,8 @@ begin
     
     -- Binarization of ADC data.
     -- In 200mV range, din >= 128 gives 1 V threshold voltage
-    ch_abcd(3) <= cha_din(7);
-    ch_abcd(2) <= chb_din(7);
+    ch_abcd(0) <= cha_din(7);
+    ch_abcd(1) <= chb_din(7);
     
     -- RLE encoding of input data
     rle1: entity work.RLECoder
@@ -83,9 +88,20 @@ begin
         port map (clk, rst_n, fifo_data_out, fifo_read,
             rle_data_out, rle_write, fifo_count);
     
+    -- Remove values from FIFO when it is read
+    process (clk, rst_n)
+    begin
+        if rst_n = '0' then
+            fsmc_nrd_r <= '0';
+        elsif rising_edge(clk) then
+            fsmc_nrd_r <= fsmc_nrd;
+        end if;
+    end process;
+    fsmc_nrd_edge <= '1' when (fsmc_nrd = '1' and fsmc_nrd_r = '0') else '0';
+    
     -- Output either fifo data (if cfg_read_count = 0) or fifo count
     output_data <= fifo_data_out when (cfg_read_count = '0') else fifo_count;
-    fifo_read <= (not fsmc_nrd) when (cfg_read_count = '0') else '0';
+    fifo_read <= fsmc_nrd_edge when (cfg_read_count = '0') else '0';
     
     -- FSMC bus control
     fsmc_db <= output_data

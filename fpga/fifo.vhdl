@@ -44,6 +44,8 @@ architecture rtl of FIFO is
     -- buffer_r is the large RAM array that is used as a ring buffer
     signal buffer_r: FIFOArray;
     
+    signal data_out_r: std_logic_vector(width_g - 1 downto 0);
+    
     -- read_pos_r contains the index of the next item to read.
     -- write_pos_r contains the index of the next item to write.
     signal read_pos_r: natural range 0 to depth_g - 1;
@@ -52,27 +54,31 @@ architecture rtl of FIFO is
     -- count_r contains the number of items in FIFO currently.
     signal count_r: natural range 0 to depth_g;
 begin
-    data_out <= buffer_r(read_pos_r);
+    data_out <= data_out_r;
     count <= std_logic_vector(to_unsigned(count_r, 16));
     
     process(clk, rst_n)
         -- Using variables to store the read / write status.
         variable read_v: boolean;
         variable write_v: boolean;
+        variable read_pos_v: natural range 0 to depth_g - 1;
     begin
         if rst_n = '0' then
             read_pos_r <= 0;
             write_pos_r <= 0;
             count_r <= 0;
+            data_out_r <= (others => '0');
         elsif rising_edge(clk) then
             read_v := (read = '1') and (count_r /= 0);
             write_v := (write = '1') and (count_r /= depth_g);
         
+            read_pos_v := read_pos_r;
+        
             if read_v then
                 if read_pos_r = depth_g - 1 then
-                    read_pos_r <= 0;
+                    read_pos_v := 0;
                 else
-                    read_pos_r <= read_pos_r + 1;
+                    read_pos_v := read_pos_r + 1;
                 end if;
                 
                 if not write_v then
@@ -93,6 +99,14 @@ begin
                     count_r <= count_r + 1;
                 end if;
             end if;
+            
+            if read_pos_v = write_pos_r and write_v then
+                data_out_r <= data_in;
+            else
+                data_out_r <= buffer_r(read_pos_v);
+            end if;
+            
+            read_pos_r <= read_pos_v;
         end if;
     end process;
 end architecture;
