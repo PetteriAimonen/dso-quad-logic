@@ -88,12 +88,19 @@ begin
             count_r <= write_pos_r - read_pos_r;
             data_out_r <= buffer_r(to_integer(read_pos_r));
             
+            -- Increment read position unless fifo is already empty
             if read = '1' and read_pos_r /= write_pos_r then
                 read_pos_r <= read_pos_r + 1;
             end if;
             
-            if write = '1' and next_write_pos_r /= read_pos_r then
+            -- Always write the value (the last location is unused
+            -- when fifo is full).
+            if write = '1' then
                 buffer_r(to_integer(write_pos_r)) <= data_in;
+            end if;
+            
+            -- Increment write position unless fifo is already full
+            if write = '1' and next_write_pos_r /= read_pos_r then
                 write_pos_r <= next_write_pos_r;
                 next_write_pos_r <= next_write_pos_r + 1;
             end if;
