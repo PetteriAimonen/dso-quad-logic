@@ -28,7 +28,7 @@ entity FIFO is
 
         -- Data input port. When 'write' is high on clock edge,
         -- the value on data_in port is stored in the queue. If
-        -- 'count' is depth_g, the FIFO is full and write is
+        -- 'count' is depth_g - 1, the FIFO is full and write is
         -- ignored.
         data_in:    in std_logic_vector(width_g - 1 downto 0);
         write:      in std_logic;

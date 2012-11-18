@@ -53,7 +53,7 @@ architecture rtl of fpga_top is
     signal output_data:         std_logic_vector(15 downto 0);
     
     -- FSMC read signal (to detect edges)
-    signal fsmc_nrd_r:          std_logic;
+    signal fsmc_was_read_r:     boolean;
     signal fsmc_nrd_edge:       std_logic;
 begin
     -- ADC is clocked directly from 72 MHz output from the STM32
@@ -75,6 +75,7 @@ begin
     
     -- Binarization of ADC data.
     -- In 200mV range, din >= 128 gives 1 V threshold voltage
+    -- Note: apparently these should be inverted.
     ch_abcd(0) <= cha_din(7);
     ch_abcd(1) <= chb_din(7);
     
@@ -88,16 +89,16 @@ begin
         port map (clk, rst_n, fifo_data_out, fifo_read,
             rle_data_out, rle_write, fifo_count);
     
-    -- Remove values from FIFO when it is read
+    -- Remove values from FIFO on rising edge of fsmc_nrd
     process (clk, rst_n)
     begin
         if rst_n = '0' then
-            fsmc_nrd_r <= '0';
+            fsmc_was_read_r <= false;
         elsif rising_edge(clk) then
-            fsmc_nrd_r <= fsmc_nrd;
+            fsmc_was_read_r <= (fsmc_nrd = '0' and fsmc_ce = '1');
         end if;
     end process;
-    fsmc_nrd_edge <= '1' when (fsmc_nrd = '1' and fsmc_nrd_r = '0') else '0';
+    fsmc_nrd_edge <= '1' when (fsmc_nrd = '1' and fsmc_was_read_r) else '0';
     
     -- Output either fifo data (if cfg_read_count = 0) or fifo count
     output_data <= fifo_data_out when (cfg_read_count = '0') else fifo_count;
