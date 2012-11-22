@@ -15,6 +15,8 @@ begin
         port map (clk, rst_n, data_in, data_out, write);
     
     process
+        variable time_v: integer;
+    
         procedure clock is
             constant PERIOD: time := 1 us;
         begin
@@ -32,6 +34,7 @@ begin
         data_in <= "1010";
         
         clock;
+        clock;
         
         assert write = '1' and data_out = X"002A" report "Wrong output pair";
         
@@ -39,15 +42,55 @@ begin
         
         assert write = '0' report "Unexpected write";
 
-        for i in 1 to 255 loop
+        for i in 2 to 255 loop
             clock;
         end loop;
         
         data_in <= "1111";
         
         clock;
+        clock;
         
         assert write = '1' and data_out = X"100F" report "Wrong output pair";
+        
+        -- Test long segment write
+        for i in 1 to 4095 loop
+            clock;
+        end loop;
+        
+        data_in <= "0000";
+        clock;
+        
+        assert write = '1' and data_out = X"8002" report "Wrong time segment";
+        
+        data_in <= "1111";
+        clock;
+        
+        assert write = '1' and data_out = X"0000" report "Wrong output pair";
+        clock;
+        
+        assert write = '1' and data_out = X"000F" report "Wrong output pair";
+        
+        -- Test periodic time segment write
+        -- Too slow test :)
+--         time_v := 0;
+--         for i in 2 to 100000000 loop
+--             clock;
+--             if write = '1' then
+--                 assert data_out(15) = '1' report "Expected time segment";
+--                 time_v := time_v + to_integer(unsigned(data_out(14 downto 0))) * 2048;
+--             end if;
+--         end loop;
+--         
+--         data_in <= "0000";
+--         clock;
+--         assert data_out(15) = '1' report "Expected time segment";
+--         time_v := time_v + to_integer(unsigned(data_out(14 downto 0))) * 2048;
+--         clock;
+--         assert data_out(15) = '0' report "Expected data segment";
+--         assert data_out(3 downto 0) = "1111" report "Wrong data";
+--         time_v := time_v + to_integer(unsigned(data_out(14 downto 4)));
+--         assert time_v = 100000000 report "Wrong time";
         
         report "Simulation ended" severity note;
         wait;

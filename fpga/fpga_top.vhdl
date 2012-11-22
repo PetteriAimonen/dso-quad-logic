@@ -65,7 +65,7 @@ begin
     ch_cd_in <= chd_din & chc_din;
     ch_abcd(3 downto 2) <= ch_cd_delayed;
     delay1: entity work.Delay
-        generic map (width_g => 2, delay_g => 5)
+        generic map (width_g => 2, delay_g => 4)
         port map (clk, rst_n, ch_cd_in, ch_cd_delayed);
     
     -- Configuration register
@@ -75,9 +75,9 @@ begin
     
     -- Binarization of ADC data.
     -- In 200mV range, din >= 128 gives 1 V threshold voltage
-    -- Note: apparently these should be inverted.
-    ch_abcd(0) <= cha_din(7);
-    ch_abcd(1) <= chb_din(7);
+    -- Note: apparently these have to be inverted.
+    ch_abcd(0) <= '1' when cha_din(7) = '0' else '0';
+    ch_abcd(1) <= '1' when chb_din(7) = '0' else '0';
     
     -- RLE encoding of input data
     rle1: entity work.RLECoder
