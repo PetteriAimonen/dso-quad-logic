@@ -37,6 +37,9 @@ architecture rtl of fpga_top is
     signal ch_cd_delayed:       std_logic_vector(1 downto 0);
     signal ch_abcd:             std_logic_vector(3 downto 0);
     
+    -- Input channels after edge matching
+    signal ch_abcd_matched:     std_logic_vector(3 downto 0);
+    
     -- Configuration register signals
     signal cfg_read_count:       std_logic;
     
@@ -79,9 +82,14 @@ begin
     ch_abcd(0) <= '1' when cha_din(7) = '0' else '0';
     ch_abcd(1) <= '1' when chb_din(7) = '0' else '0';
     
+    -- Matching of edges
+    em1: entity work.EdgeMatcher
+        generic map (width_g => 4)
+        port map (clk, rst_n, ch_abcd, ch_abcd_matched);
+    
     -- RLE encoding of input data
     rle1: entity work.RLECoder
-        port map (clk, rst_n, ch_abcd, rle_data_out, rle_write);
+        port map (clk, rst_n, ch_abcd_matched, rle_data_out, rle_write);
     
     -- FIFO storage of data
     fifo1: entity work.FIFO
