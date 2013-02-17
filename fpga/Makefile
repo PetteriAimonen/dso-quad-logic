@@ -1,30 +1,27 @@
 VHDL_SOURCE = fifo.vhdl rle_coder.vhdl edge_matcher.vhdl \
-	config.vhdl delay.vhdl fpga_top.vhdl
+	config.vhdl delay.vhdl pipelined_subtract.vhdl \
+	pipelined_counter.vhdl fpga_top.vhdl
+
+TESTBENCHES = tb_fifo tb_rle_coder tb_edge_matcher \
+	tb_pipelined_subtract tb_pipelined_counter
 
 all: syntax_check run_tbs
 
 clean:
-	rm *.o *.cf
+	rm -f *.o *.cf $(TESTBENCHES) *.ghw
 
 # ----- GHDL simulator -----
 
 syntax_check: $(VHDL_SOURCE)
 	ghdl -a $(GHDL_ARGS) $^
 
-tb_fifo: fifo.vhdl tb_fifo.vhdl
+tb_%: tb_%.vhdl | syntax_check
 	ghdl -a $(GHDL_ARGS) $^
 	ghdl -e $(GHDL_ARGS) $@
 
-tb_rle_coder: rle_coder.vhdl tb_rle_coder.vhdl
-	ghdl -a $(GHDL_ARGS) $^
-	ghdl -e $(GHDL_ARGS) $@
-
-tb_edge_matcher: edge_matcher.vhdl tb_edge_matcher.vhdl
-	ghdl -a $(GHDL_ARGS) $^
-	ghdl -e $(GHDL_ARGS) $@
-
-run_tbs: tb_fifo tb_rle_coder tb_edge_matcher
-	./tb_fifo
-	./tb_rle_coder
-	./tb_edge_matcher
+run_tbs: $(TESTBENCHES)
+	$(foreach test, $^, \
+	echo $(test) && \
+	./$(test) --wave=$(test).ghw && \
+	) true
 
