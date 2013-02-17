@@ -300,15 +300,25 @@ void _fputc(char c)
     }
 }
 
-// Hackish
-typedef void (*putcf) (void *, char);
-void tfp_format(void *putp, putcf putf, const char *fmt, va_list va);
-
-// Wrapper of _fputc for tinyprintf.
-static void file_putp(void *p, char c)
+size_t file_write(FILE *stream, const char *ptr, size_t size)
 {
-    _fputc(c);
+    size_t i;
+    char *p = (char*)ptr;
+    for (i = 0; i < size; i++)
+    {
+        _fputc(*p++);
+    }
+    
+    return i;
 }
+
+static const struct File_methods file_methods = {
+    file_write,
+    NULL
+};
+
+static const struct File _current_file = {&file_methods};
+FILE* const current_file = (FILE*)&_current_file;
 
 // Close the currently open file. Checks the error status and returns false
 // if any error has occurred since opening the file.
@@ -331,7 +341,7 @@ int _fprintf(const char *fmt, ...)
     uint32_t first_length = file_length;
     va_list va;
     va_start(va, fmt);
-    tfp_format(NULL, file_putp, fmt, va);
+    vfprintf(current_file, fmt, va);
     va_end(va);
     
     return file_length - first_length;
